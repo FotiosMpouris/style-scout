@@ -15,8 +15,8 @@ st.write("Find your perfect outfit with AI-powered search!")
 
 # Load API keys from Streamlit secrets
 try:
-    OPENAI_KEY = st.secrets["openai"]["OPENAI_API_KEY"]
-    PPLX_KEY = st.secrets["perplexity"]["PPLX_API_KEY"]
+    OPENAI_KEY = st.secrets["OPENAI_API_KEY"]
+    PPLX_KEY = st.secrets["PPLX_API_KEY"]
     openai.api_key = OPENAI_KEY
 except Exception as e:
     st.error("Please set up your API keys in Streamlit Cloud secrets.")
