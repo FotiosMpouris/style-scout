@@ -6,6 +6,7 @@ import re
 from PIL import Image
 import io
 import base64
+import time
 
 # Page configuration with fashion-forward styling
 st.set_page_config(
@@ -81,30 +82,6 @@ st.markdown("""
         box-shadow: 0 12px 40px rgba(0,0,0,0.15);
     }
     
-    .product-image {
-        border-radius: 10px;
-        width: 100%;
-        height: 200px;
-        object-fit: cover;
-        margin-bottom: 1rem;
-    }
-    
-    .product-title {
-        font-family: 'Inter', sans-serif;
-        font-weight: 600;
-        font-size: 1.1rem;
-        color: #333;
-        margin-bottom: 0.5rem;
-    }
-    
-    .product-price {
-        font-family: 'Inter', sans-serif;
-        font-weight: 500;
-        font-size: 1.2rem;
-        color: #ff6b6b;
-        margin-bottom: 0.5rem;
-    }
-    
     .shop-button {
         background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
         color: white;
@@ -126,23 +103,67 @@ st.markdown("""
         text-decoration: none;
     }
     
-    .voice-button {
+    .vintage-button {
+        background: linear-gradient(45deg, #8B4513, #D2691E);
+        color: white;
+        border: none;
+        padding: 0.7rem 1.5rem;
+        border-radius: 25px;
+        font-weight: 500;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.3s ease;
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .vintage-button:hover {
+        background: linear-gradient(45deg, #A0522D, #CD853F);
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(139,69,19,0.4);
+        color: white;
+        text-decoration: none;
+    }
+    
+    .voice-recording {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(15px);
+        border-radius: 15px;
+        padding: 2rem;
+        margin: 1rem 0;
+        text-align: center;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        border: 1px solid rgba(255,255,255,0.3);
+    }
+    
+    .recording-button {
         background: linear-gradient(45deg, #4ecdc4, #44a08d);
         color: white;
         border: none;
-        padding: 1rem 2rem;
+        padding: 1.5rem 3rem;
         border-radius: 50px;
         font-weight: 600;
-        font-size: 1.1rem;
+        font-size: 1.2rem;
         margin: 1rem;
         transition: all 0.3s ease;
         cursor: pointer;
+        box-shadow: 0 5px 20px rgba(78,205,196,0.3);
     }
     
-    .voice-button:hover {
+    .recording-button:hover {
         background: linear-gradient(45deg, #26d0ce, #2a5c5a);
         transform: translateY(-3px);
         box-shadow: 0 8px 25px rgba(78,205,196,0.4);
+    }
+    
+    .recording-active {
+        background: linear-gradient(45deg, #ff6b6b, #ff8e8e) !important;
+        animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
     }
     
     .stTextInput > div > div > input {
@@ -186,10 +207,29 @@ st.markdown("""
         font-style: italic;
         color: #555;
     }
+    
+    .vintage-indicator {
+        background: linear-gradient(45deg, #8B4513, #D2691E);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin: 0.5rem 0;
+        display: inline-block;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# Header section with gorgeous styling
+# Initialize session state
+if 'search_mode' not in st.session_state:
+    st.session_state.search_mode = "text"
+if 'audio_data' not in st.session_state:
+    st.session_state.audio_data = None
+if 'transcribed_text' not in st.session_state:
+    st.session_state.transcribed_text = ""
+
+# Header section
 st.markdown("""
 <div class="main-header">
     <h1 class="main-title">Style Scout</h1>
@@ -206,132 +246,38 @@ except Exception as e:
     st.error("🔑 Please set up your API keys in Streamlit Cloud secrets.")
     st.stop()
 
-# Voice recording function
-def record_audio():
-    """Handle voice recording with HTML5 Audio API"""
-    audio_html = """
-    <div style="text-align: center; margin: 2rem 0;">
-        <button id="recordBtn" class="voice-button" onclick="toggleRecording()">
-            🎙️ Start Recording
-        </button>
-        <div id="status" style="margin-top: 1rem; font-weight: 500;"></div>
-        <audio id="audioPlayback" controls style="display: none; margin-top: 1rem; width: 100%;"></audio>
-    </div>
-    
-    <script>
-    let mediaRecorder;
-    let audioChunks = [];
-    let isRecording = false;
-    
-    async function toggleRecording() {
-        const btn = document.getElementById('recordBtn');
-        const status = document.getElementById('status');
-        
-        if (!isRecording) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
-                
-                mediaRecorder.ondataavailable = event => {
-                    audioChunks.push(event.data);
-                };
-                
-                mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                    const audioUrl = URL.createObjectURL(audioBlob);
-                    const audio = document.getElementById('audioPlayback');
-                    audio.src = audioUrl;
-                    audio.style.display = 'block';
-                    
-                    // Convert to base64 for Streamlit
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        const base64 = reader.result.split(',')[1];
-                        window.parent.postMessage({
-                            type: 'audio_recorded',
-                            data: base64
-                        }, '*');
-                    };
-                    reader.readAsDataURL(audioBlob);
-                };
-                
-                mediaRecorder.start();
-                isRecording = true;
-                btn.textContent = '⏹️ Stop Recording';
-                btn.style.background = 'linear-gradient(45deg, #ff6b6b, #ff8e8e)';
-                status.textContent = '🔴 Recording... Speak now!';
-                status.style.color = '#ff6b6b';
-                
-            } catch (err) {
-                status.textContent = '❌ Microphone access denied';
-                status.style.color = '#ff6b6b';
-            }
-        } else {
-            mediaRecorder.stop();
-            mediaRecorder.stream.getTracks().forEach(track => track.stop());
-            isRecording = false;
-            btn.textContent = '🎙️ Start Recording';
-            btn.style.background = 'linear-gradient(45deg, #4ecdc4, #44a08d)';
-            status.textContent = '✅ Recording complete! Processing...';
-            status.style.color = '#4ecdc4';
-        }
-    }
-    </script>
-    """
-    return audio_html
-
-# Fashion tips for better UX
-fashion_tips = [
-    "💡 **Pro Tip**: Mention specific designers, colors, or occasions for better results!",
-    "✨ **Style Hack**: Try describing the vibe - 'coastal grandmother', 'dark academia', 'cottagecore'",
-    "🎯 **Search Smarter**: Include your budget range for more relevant results",
-    "👑 **Celebrity Inspo**: Reference your style icons - 'like Zendaya's red carpet look'",
-    "🌟 **Occasion Matters**: Specify if it's for work, dates, casual, or special events"
-]
-
-# Extract image URLs from text using regex
-def extract_image_urls(text):
-    """Extract image URLs from text using various patterns"""
-    patterns = [
-        r'https?://[^\s<>"]*\.(?:jpg|jpeg|png|gif|webp)(?:\?[^\s<>"]*)?',
-        r'!\[.*?\]\((https?://[^\s)]+)\)',  # Markdown images
-        r'<img[^>]+src=["\']([^"\']+)["\'][^>]*>',  # HTML img tags
+# Detect if search is for vintage/secondhand items
+def is_vintage_search(query):
+    """Detect if the search is for vintage, used, or secondhand items"""
+    vintage_keywords = [
+        'vintage', 'used', 'secondhand', 'second hand', 'pre-owned', 'thrift', 
+        'consignment', 'pre-loved', 'previously owned', 'estate', 'antique',
+        'retro', 'preloved', 'gently used', 'resale'
     ]
-    
-    urls = []
-    for pattern in patterns:
-        urls.extend(re.findall(pattern, text, re.IGNORECASE))
-    
-    return list(set(urls))  # Remove duplicates
+    query_lower = query.lower()
+    return any(keyword in query_lower for keyword in vintage_keywords)
 
 # Extract product info from text
 def extract_product_info(text):
     """Extract structured product information from AI response"""
     products = []
-    
-    # Split by common separators and look for product-like entries
     sections = re.split(r'\n\s*\n|\d+\.\s+|\*\*|\#\#', text)
     
     for section in sections:
-        if len(section.strip()) < 20:  # Skip very short sections
+        if len(section.strip()) < 20:
             continue
             
-        # Look for price patterns
         price_match = re.search(r'\$[\d,]+(?:\.\d{2})?', section)
         price = price_match.group() if price_match else None
         
-        # Look for URLs
         url_match = re.search(r'https?://[^\s<>"]+', section)
         url = url_match.group() if url_match else None
         
-        # Extract title (first substantial line)
         lines = [line.strip() for line in section.split('\n') if line.strip()]
         title = lines[0] if lines else section[:100] + "..."
         
-        # Clean title
-        title = re.sub(r'^[\d\.\-\*\s]+', '', title)  # Remove numbering
-        title = re.sub(r'\*+', '', title)  # Remove asterisks
+        title = re.sub(r'^[\d\.\-\*\s]+', '', title)
+        title = re.sub(r'\*+', '', title)
         title = title.strip()
         
         if title and len(title) > 5:
@@ -342,12 +288,69 @@ def extract_product_info(text):
                 'description': section.strip()
             })
     
-    return products[:6]  # Limit to 6 products
+    return products[:6]
+
+# Voice recording component
+def voice_recorder():
+    """Create voice recording interface"""
+    st.markdown('<div class="voice-recording">', unsafe_allow_html=True)
+    st.markdown("### 🎙️ Voice Fashion Search")
+    st.markdown("Click to record your fashion request:")
+    
+    # Audio recorder using st.audio_input (available in newer Streamlit versions)
+    audio_file = st.file_uploader("Record or upload audio", type=['wav', 'mp3', 'm4a'], key="audio_upload")
+    
+    if audio_file is not None:
+        st.audio(audio_file)
+        
+        if st.button("🔄 Transcribe Audio", key="transcribe_btn"):
+            with st.spinner("🎧 Transcribing your voice..."):
+                try:
+                    # Prepare audio file for OpenAI Whisper
+                    audio_bytes = audio_file.read()
+                    
+                    # Create a temporary file-like object
+                    audio_file_obj = io.BytesIO(audio_bytes)
+                    audio_file_obj.name = "audio.wav"
+                    
+                    # Transcribe with OpenAI Whisper
+                    transcript = openai.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=audio_file_obj,
+                        response_format="text"
+                    )
+                    
+                    st.session_state.transcribed_text = transcript
+                    st.success(f"✨ I heard: '{transcript}'")
+                    
+                except Exception as e:
+                    st.error(f"Transcription error: {str(e)}")
+    
+    # Manual voice input as backup
+    st.markdown("**Or type what you would say:**")
+    manual_voice = st.text_input("", placeholder="Type your voice search here...", key="manual_voice")
+    
+    if manual_voice:
+        st.session_state.transcribed_text = manual_voice
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    return st.session_state.transcribed_text
+
+# Fashion tips
+fashion_tips = [
+    "💡 **Pro Tip**: Mention specific designers, colors, or occasions for better results!",
+    "✨ **Style Hack**: Try describing the vibe - 'coastal grandmother', 'dark academia', 'cottagecore'",
+    "🎯 **Search Smarter**: Include your budget range for more relevant results",
+    "👑 **Celebrity Inspo**: Reference your style icons - 'like Zendaya's red carpet look'",
+    "🌟 **Occasion Matters**: Specify if it's for work, dates, casual, or special events",
+    "♻️ **Sustainable Style**: Try 'vintage', 'secondhand', or 'preloved' for eco-friendly finds!"
+]
 
 # Search container
 st.markdown('<div class="search-container">', unsafe_allow_html=True)
 
-# Input mode selection with gorgeous styling
+# Input mode selection
 col1, col2 = st.columns([1, 1])
 
 with col1:
@@ -358,17 +361,13 @@ with col2:
     if st.button("🎙️ Voice Search", use_container_width=True):
         st.session_state.search_mode = "voice"
 
-# Initialize search mode
-if 'search_mode' not in st.session_state:
-    st.session_state.search_mode = "text"
-
 user_query = ""
 
 if st.session_state.search_mode == "text":
     st.markdown("### ✍️ Describe Your Perfect Look")
     user_query = st.text_input(
         "",
-        placeholder="✨ Try: 'Hailey Bieber airport style under $200' or 'cottagecore dress for spring wedding'",
+        placeholder="✨ Try: 'vintage leather jacket like Kurt Cobain' or 'secondhand designer bag under $300'",
         key="fashion_query"
     )
     
@@ -377,21 +376,19 @@ if st.session_state.search_mode == "text":
     st.markdown(f'<div class="fashion-tip">{random.choice(fashion_tips)}</div>', unsafe_allow_html=True)
 
 elif st.session_state.search_mode == "voice":
-    st.markdown("### 🎙️ Voice Search")
-    st.markdown("Click the button below to record your fashion request:")
-    
-    # Voice recording interface
-    audio_component = st.components.v1.html(record_audio(), height=200)
-    
-    # Handle audio transcription (placeholder for now)
-    if st.button("🔄 Process Voice Recording"):
-        st.info("Voice processing will be implemented in the next update! Please use text search for now.")
+    user_query = voice_recorder()
 
 st.markdown('</div>', unsafe_allow_html=True)
 
 # Search button and processing
 if st.button("🔍 Find My Perfect Style!", disabled=not user_query, use_container_width=True, key="main_search"):
     if user_query:
+        # Check if this is a vintage/secondhand search
+        is_vintage = is_vintage_search(user_query)
+        
+        if is_vintage:
+            st.markdown('<div class="vintage-indicator">🌿 Sustainable Fashion Search Detected</div>', unsafe_allow_html=True)
+        
         # Progress tracking
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -401,7 +398,27 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query, use_contain
         
         try:
             # Step 1: Refine query with fashion expertise
-            system_prompt = """You are an expert fashion stylist and personal shopper with deep knowledge of current trends, designers, and shopping. Convert the user's fashion request into a sophisticated search strategy that captures both their style preferences and practical shopping needs.
+            if is_vintage:
+                system_prompt = """You are an expert vintage fashion curator and sustainable style consultant. The user is looking for secondhand, vintage, or pre-owned fashion items. Convert their request into search terms that work well for vintage/secondhand platforms like Depop, Poshmark, eBay, TheRealReal, Vestiaire Collective, and ThredUp.
+
+Consider:
+- Vintage eras and specific style periods (90s, Y2K, 70s boho, etc.)
+- Designer brands that hold value in resale markets
+- Condition descriptions (excellent, good, fair)
+- Authentication concerns for luxury items
+- Size variations in vintage clothing
+- Sustainable fashion terminology
+
+Format for secondhand platforms. Include era, style descriptors, and brand suggestions.
+
+Examples:
+- "something like Kurt Cobain wore" → "vintage 90s grunge flannel band tee leather jacket"
+- "designer bag but affordable" → "pre-owned luxury handbag Kate Spade Coach vintage"
+- "retro dress for date night" → "vintage midi dress 70s boho or 90s slip dress"
+
+Keep it focused and under 15 words."""
+            else:
+                system_prompt = """You are an expert fashion stylist and personal shopper with deep knowledge of current trends, designers, and shopping. Convert the user's fashion request into a sophisticated search strategy that captures both their style preferences and practical shopping needs.
 
 Consider:
 - Current fashion trends and seasonal appropriateness
@@ -434,13 +451,41 @@ Keep it focused and under 15 words."""
             status_text.text("🔍 Searching the best fashion retailers...")
             progress_bar.progress(50)
             
-            # Step 2: Search with Perplexity for shopping results
+            # Step 2: Choose search domains based on vintage detection
+            if is_vintage:
+                search_domains = [
+                    "depop.com", "poshmark.com", "ebay.com", "therealreal.com",
+                    "vestiairecollective.com", "thredup.com", "rebag.com",
+                    "fashionphile.com", "tradesy.com", "vinted.com"
+                ]
+                search_focus = "vintage, secondhand, and pre-owned fashion platforms"
+            else:
+                search_domains = [
+                    "zara.com", "hm.com", "nordstrom.com", "asos.com", 
+                    "urbanoutfitters.com", "target.com", "amazon.com",
+                    "mango.com", "revolve.com", "shopbop.com"
+                ]
+                search_focus = "trusted fashion retailers"
+            
+            # Search with Perplexity
             headers = {
                 "Authorization": f"Bearer {PPLX_KEY}",
                 "Content-Type": "application/json"
             }
             
-            search_prompt = f"""Find specific clothing items for: {refined_query}
+            if is_vintage:
+                search_prompt = f"""Find specific vintage/secondhand clothing items for: {refined_query}
+
+Please provide:
+1. Specific vintage or pre-owned items with detailed descriptions
+2. Estimated price ranges for secondhand market
+3. Direct links from secondhand platforms like Depop, Poshmark, eBay, TheRealReal, ThredUp, Vestiaire Collective
+4. Tips for buying vintage/secondhand (sizing, authenticity, condition)
+5. Era identification and styling suggestions
+
+Focus on sustainable fashion and secondhand marketplaces. Include authentication tips for designer items."""
+            else:
+                search_prompt = f"""Find specific clothing items for: {refined_query}
 
 Please provide:
 1. Specific product recommendations with exact names and descriptions
@@ -457,11 +502,7 @@ Include product details like colors, sizes available, and key features."""
                 "messages": [{"role": "user", "content": search_prompt}],
                 "return_citations": True,
                 "return_images": False,
-                "search_domain_filter": [
-                    "zara.com", "hm.com", "nordstrom.com", "asos.com", 
-                    "urbanoutfitters.com", "target.com", "amazon.com",
-                    "mango.com", "revolve.com", "shopbop.com"
-                ]
+                "search_domain_filter": search_domains
             }
             
             status_text.text("✨ Curating your personalized style recommendations...")
@@ -485,9 +526,10 @@ Include product details like colors, sizes available, and key features."""
                 status_text.empty()
                 
                 # Display refined search
+                search_type = "Vintage/Secondhand" if is_vintage else "New Fashion"
                 st.markdown(f"""
                 <div class="search-container">
-                    <h3>🎯 Your Style Search</h3>
+                    <h3>🎯 Your {search_type} Search</h3>
                     <p style="font-size: 1.1rem; color: #666; font-style: italic;">"{refined_query}"</p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -495,16 +537,15 @@ Include product details like colors, sizes available, and key features."""
                 # Get AI response
                 ai_response = data['choices'][0]['message']['content']
                 
-                # Extract structured product information
-                products = extract_product_info(ai_response)
-                
                 # Display AI styling advice
-                st.markdown("## 💎 Your Personal Stylist Says:")
+                advisor_title = "💎 Your Vintage Curator Says:" if is_vintage else "💎 Your Personal Stylist Says:"
+                st.markdown(f"## {advisor_title}")
                 st.markdown(f'<div class="search-container">{ai_response}</div>', unsafe_allow_html=True)
                 
                 # Display shopping links in a beautiful grid
                 if 'citations' in data and data['citations']:
-                    st.markdown("## 🛍️ Shop These Curated Picks")
+                    shop_title = "🌿 Shop Sustainable Fashion" if is_vintage else "🛍️ Shop These Curated Picks"
+                    st.markdown(f"## {shop_title}")
                     
                     # Create columns for product grid
                     cols = st.columns(2)
@@ -516,11 +557,15 @@ Include product details like colors, sizes available, and key features."""
                             # Extract domain for styling
                             domain = citation.split('/')[2].replace('www.', '').title()
                             
+                            # Choose button style based on platform type
+                            button_class = "vintage-button" if is_vintage else "shop-button"
+                            button_emoji = "♻️" if is_vintage else "✨"
+                            
                             st.markdown(f"""
                             <div class="product-card">
                                 <div class="product-title">Shop at {domain}</div>
-                                <a href="{citation}" target="_blank" class="shop-button">
-                                    ✨ Shop Now
+                                <a href="{citation}" target="_blank" class="{button_class}">
+                                    {button_emoji} Shop Now
                                 </a>
                                 <div style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">
                                     {citation[:50]}...
@@ -529,12 +574,20 @@ Include product details like colors, sizes available, and key features."""
                             """, unsafe_allow_html=True)
                 
                 # Fashion advice section
-                st.markdown("""
-                ## 💫 Styling Tips
-                <div class="fashion-tip">
-                    <strong>Stylist's Note:</strong> Remember to check size guides carefully, and don't be afraid to mix high and low-end pieces. The best outfits often combine investment pieces with trendy, affordable finds!
-                </div>
-                """, unsafe_allow_html=True)
+                if is_vintage:
+                    st.markdown("""
+                    ## 🌿 Sustainable Shopping Tips
+                    <div class="fashion-tip">
+                        <strong>Vintage Curator's Note:</strong> Always check measurements rather than size labels for vintage pieces. Ask sellers about condition, authenticity for designer items, and return policies. Vintage sizing runs smaller than modern!
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown("""
+                    ## 💫 Styling Tips
+                    <div class="fashion-tip">
+                        <strong>Stylist's Note:</strong> Remember to check size guides carefully, and don't be afraid to mix high and low-end pieces. The best outfits often combine investment pieces with trendy, affordable finds!
+                    </div>
+                    """, unsafe_allow_html=True)
                 
             else:
                 st.error(f"Search temporarily unavailable (Error: {response.status_code}). Please try again!")
