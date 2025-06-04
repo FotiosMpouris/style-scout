@@ -9,6 +9,8 @@ import base64
 import time
 from st_audiorec import st_audiorec
 from bs4 import BeautifulSoup
+from streamlit_js_eval import streamlit_js_eval
+
 
 def fetch_og_image(url: str) -> str | None:
     "Try to pull <meta property='og:image'> from the product page."
