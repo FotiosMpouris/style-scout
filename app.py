@@ -248,7 +248,7 @@ def voice_recorder():
                 model="whisper-1",
                 file=wav_io,
                 response_format="text"
-            ).text
+            )
 
         st.session_state.transcribed_text = transcript
         st.session_state.voice_search_triggered = True
