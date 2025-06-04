@@ -8,6 +8,22 @@ import io
 import base64
 import time
 from st_audiorec import st_audiorec
+from bs4 import BeautifulSoup
+
+def fetch_og_image(url: str) -> str | None:
+    "Try to pull <meta property='og:image'> from the product page."
+    try:
+        resp = requests.get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
+        soup = BeautifulSoup(resp.text, "html.parser")
+        tag = soup.find("meta", property="og:image")
+        return tag["content"] if tag and tag.get("content") else None
+    except Exception:
+        return None
+
+def unsplash_fallback(query: str) -> str:
+    # Simple, rate-limit-friendly Unsplash endpoint (no API key needed)
+    safe = query.replace(" ", "%20")
+    return f"https://source.unsplash.com/featured/?{safe}"
 
 # Page configuration with fashion-forward styling
 st.set_page_config(
@@ -229,35 +245,76 @@ def is_vintage_search(query):
 
 # Voice recording function - STREAMLINED VERSION
 def voice_recorder():
-    """Record audio from mic → Whisper → text."""
-    st.markdown('<div class="voice-recording">', unsafe_allow_html=True)
-    st.markdown("### 🎙️ Voice Fashion Search")
-    st.markdown("Click the microphone to start recording. Speak your fashion request!")
+    """
+    One-tap voice capture:
+    – Starts when user presses the mic button
+    – Browser Speech-Recognition listens for end-of-speech (≈ 0.8 s silence)
+    – Raw audio blob is returned to Python → sent to Whisper for robust transcription
+    Returns text ("" if user cancelled)
+    """
+    st.markdown("#### 🎙️ Tap the mic, speak, then wait…")
 
-    audio_bytes = st_audiorec()  # returns None until the user clicks Stop
+    # 1️⃣  Ask the browser to grab the microphone, record until silence, then
+    #     give us *both* the transcript and the raw wav blob (Base-64).
+    js = """
+    () => new Promise(async (resolve) => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) { resolve({err:'SpeechRecognition not supported'}); return; }
 
-    if audio_bytes is not None:
-        st.audio(audio_bytes, format="audio/wav")
+        /* Prepare voice recorder */
+        const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+        const mediaRecorder = new MediaRecorder(stream);
+        const chunks = [];
+        mediaRecorder.ondataavailable = e => chunks.push(e.data);
 
-        with st.spinner("🔊 Transcribing your voice..."):
-            # Whisper needs a file-like object
-            wav_io = io.BytesIO(audio_bytes)
-            wav_io.name = "speech.wav"
+        /* Browser speech-to-text (auto-stops on ~800 ms silence) */
+        const rec = new SpeechRecognition();
+        rec.lang = 'en-US';
+        rec.interimResults = false;
+        rec.continuous = false;        // stop on silence automatically
 
-            transcript = openai.audio.transcriptions.create(
+        rec.onresult = e => {
+          const transcript = e.results[0][0].transcript;
+          mediaRecorder.stop();
+          rec.stop();
+          /* when mediaRecorder stops we’ll resolve() with both */
+          mediaRecorder.onstop = async () => {
+              const blob = new Blob(chunks, { type:'audio/webm' });
+              const arr = new Uint8Array(await blob.arrayBuffer());
+              const b64 = btoa(String.fromCharCode(...arr));
+              resolve({text: transcript, wav: b64});
+          };
+        };
+        rec.onerror = e => resolve({err: e.error});
+        rec.start();                   // 🚀
+        mediaRecorder.start();
+    });
+    """
+    result = streamlit_js_eval(js_code=js, key="voice_js")
+
+    # 2️⃣  Handle errors / user cancellation
+    if not result or result.get("err"):
+        st.error("Speech recognition not available in this browser.")
+        return ""
+
+    if not result.get("text"):
+        st.warning("No speech detected.")
+        return ""
+
+    # 3️⃣ Whisper transcription for accuracy
+    st.session_state.voice_search_triggered = True   # allows auto-search
+    with st.spinner("🎧 Refining transcription with Whisper…"):
+        wav_bytes = base64.b64decode(result["wav"])
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
+            tmp.write(wav_bytes)
+            tmp.flush()
+            whisper = openai.audio.transcriptions.create(
                 model="whisper-1",
-                file=wav_io,
+                file=open(tmp.name, "rb"),
                 response_format="text"
             )
-
-        st.session_state.transcribed_text = transcript
-        st.session_state.voice_search_triggered = True
-        st.success(f"✨ I heard: '{transcript}'")
-        st.rerun()  # Trigger immediate search
-
-    st.markdown('</div>', unsafe_allow_html=True)
-    return st.session_state.get("transcribed_text", "")
-
+    st.success(f"✨ I heard: “{whisper}”")
+    return whisper
 # Perform the actual search function
 def perform_fashion_search(user_query):
     """Perform the fashion search with given query"""
@@ -432,9 +489,11 @@ Include product details like colors, sizes available, and key features."""
                     col = cols[i % 2]
 
                     # Perplexity's citation object now has title, url, and (when available) image_url
-                    img_url = citation.get("image_url")
-                    title_txt = citation.get("title", "See product")
-                    link_url = citation["url"]
+                   
+                     img_url = (citation.get("image_url")
+                     or fetch_og_image(link_url)
+                     or unsplash_fallback(refined_query)
+                     )
 
                     button_css = "vintage-button" if is_vintage else "shop-button"
                     button_icn = "♻️" if is_vintage else "✨"
