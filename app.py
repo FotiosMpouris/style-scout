@@ -432,9 +432,12 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
             images = data.get("images", [])
             st.write(f"**Debug:** Found {len(images)} images in separate images array")
             
-            # Debug: Show first few images
+            # Debug: Show first few images and their structure
             for j, img in enumerate(images[:3]):
-                st.write(f"Image {j}: {str(img)[:100] if img else 'None'}")
+                if isinstance(img, dict) and 'image_url' in img:
+                    st.write(f"Image {j}: {img['image_url'][:80]}...")
+                else:
+                    st.write(f"Image {j}: {str(img)[:80]}...")
 
             cols = st.columns(2)
             for i, prod in enumerate([p for p in data["search_results"] if looks_like_product(p.get("url",""))][:8]):
@@ -444,10 +447,15 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
                 with cols[i % 2]:
                     st.markdown('<div class="product-card">', unsafe_allow_html=True)
 
-                    # Try to get image from images array by index
+                    # Extract image URL from dictionary or use directly
                     image_url = None
                     if i < len(images) and images[i] is not None:
-                        image_url = images[i]
+                        img_data = images[i]
+                        if isinstance(img_data, dict) and 'image_url' in img_data:
+                            image_url = img_data['image_url']
+                        elif isinstance(img_data, str):
+                            image_url = img_data
+                        
                         st.write(f"**Debug:** Using image {i}: {str(image_url)[:50]}...")
                     
                     if image_url:
@@ -458,7 +466,7 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
                             st.write(f"❌ Image failed to load: {str(e)}")
                             st.markdown("📸 **Image unavailable**")
                     else:
-                        st.write(f"❌ No image available for index {i}")
+                        st.write(f"❌ No valid image URL for index {i}")
                         st.markdown("📸 **No image provided**")
 
                     # title & price
