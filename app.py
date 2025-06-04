@@ -428,13 +428,9 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
             shop_title = "🌿 Shop Sustainable Fashion" if is_vintage else "🛍️ Shop These Curated Picks"
             st.markdown(f"## {shop_title}")
 
-            # Debug: Show what we're getting from Perplexity
-            st.write("**Debug - Search Results:**")
-            st.write(f"Found {len(data['search_results'])} results")
-            for i, result in enumerate(data['search_results'][:3]):
-                st.write(f"Result {i+1}: {result.keys()}")
-                if result.get('image_url'):
-                    st.write(f"  - Image URL: {result['image_url'][:100]}...")
+            # Get images from separate images array
+            images = data.get("images", [])
+            st.write(f"**Debug:** Found {len(images)} images in separate images array")
 
             cols = st.columns(2)
             for i, prod in enumerate([p for p in data["search_results"] if looks_like_product(p.get("url",""))][:8]):
@@ -444,10 +440,13 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
                 with cols[i % 2]:
                     st.markdown('<div class="product-card">', unsafe_allow_html=True)
 
-                    # Enhanced image handling with debugging
-                    image_url = prod.get("image_url") or prod.get("image") or prod.get("thumbnail")
+                    # Try to get image from images array by index
+                    image_url = None
+                    if i < len(images):
+                        image_url = images[i]
+                        st.write(f"**Debug:** Using image {i}: {image_url[:50] if image_url else 'None'}...")
+                    
                     if image_url:
-                        st.write(f"**Debug:** Trying to load image: {image_url[:50]}...")
                         try:
                             st.image(image_url, use_column_width=True)
                             st.write("✅ Image loaded successfully")
@@ -455,7 +454,7 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
                             st.write(f"❌ Image failed to load: {e}")
                             st.markdown("📸 **Image unavailable**")
                     else:
-                        st.write("❌ No image URL found in data")
+                        st.write("❌ No image available for this index")
                         st.markdown("📸 **No image provided**")
 
                     # title & price
