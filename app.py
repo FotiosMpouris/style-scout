@@ -490,10 +490,10 @@ Include product details like colors, sizes available, and key features."""
 
                     # Perplexity's citation object now has title, url, and (when available) image_url
                    
-                     img_url = (citation.get("image_url")
-                     or fetch_og_image(link_url)
-                     or unsplash_fallback(refined_query)
-                     )
+                    img_url = (citation.get("image_url")
+                    or fetch_og_image(link_url)
+                    or unsplash_fallback(refined_query)
+                    )
 
                     button_css = "vintage-button" if is_vintage else "shop-button"
                     button_icn = "♻️" if is_vintage else "✨"
