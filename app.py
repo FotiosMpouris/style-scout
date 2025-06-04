@@ -6,7 +6,7 @@ import re
 import io
 import time
 from functools import wraps
-from st_audiorec import st_audiorec
+from audio_recorder_streamlit import audio_recorder
 
 # Page configuration
 st.set_page_config(
@@ -223,122 +223,105 @@ def is_vintage_search(query):
     ]
     return any(keyword in query.lower() for keyword in vintage_keywords)
 
-def is_valid_product_url(url):
-    """Check if URL is likely a product page"""
-    if not url or url == "#":
-        return False
-    
-    # Look for product indicators in URL
-    product_indicators = [
-        '/product/', '/item/', '/p/', '/products/', '/shop/',
-        '/buy/', '/listing/', '/goods/', '/merchandise/'
-    ]
-    
-    url_lower = url.lower()
-    
-    # Check for product indicators
-    has_product_indicator = any(indicator in url_lower for indicator in product_indicators)
-    
-    # Avoid homepage and category pages
-    avoid_patterns = [
-        '/category/', '/collection/', '/search/', '/filter/',
-        '/brand/', '/sale/', '/clearance/', '/about/', '/contact/'
-    ]
-    
-    has_avoid_pattern = any(pattern in url_lower for pattern in avoid_patterns)
-    
-    # Check if URL ends with homepage patterns
-    homepage_endings = ['/', '/home', '/index', '.com', '.net', '.org']
-    is_homepage = any(url_lower.endswith(ending) for ending in homepage_endings)
-    
-    return has_product_indicator and not has_avoid_pattern and not is_homepage
+def looks_like_product(url: str) -> bool:
+    """Quick check to filter out obvious non-product pages"""
+    bad_parts = ["blog", "category", "collections", "search?", "help"]
+    return all(bp not in url.lower() for bp in bad_parts)
 
 def voice_recorder():
-    """Fixed voice recording with st_audiorec"""
-    st.markdown('<div class="voice-recording">', unsafe_allow_html=True)
+    """Record from mic, transcribe with Whisper, return text."""
     st.markdown("### 🎙️ Voice Fashion Search")
-    st.markdown("Click the record button and describe what you're looking for:")
     
-    # Use st_audiorec for actual microphone recording
-    audio_bytes = st_audiorec()
+    # Clean microphone interface - just the button
+    audio_bytes = audio_recorder(
+        text="🎤",
+        recording_color="#ff6b6b",
+        neutral_color="#667eea", 
+        icon_name="microphone",
+        icon_size="2x",
+        pause_threshold=2.0,
+        key="voice_recorder"
+    )
     
-    if audio_bytes is not None:
-        st.audio(audio_bytes, format="audio/wav")
-        
+    if audio_bytes:
         with st.spinner("🎧 Transcribing your voice..."):
             try:
-                # Create a BytesIO object for Whisper API
-                audio_file = io.BytesIO(audio_bytes)
-                audio_file.name = "recorded_audio.wav"
+                import tempfile
+                import os
                 
-                # Transcribe with OpenAI Whisper
+                # Write bytes to a temp file because Whisper expects a file-like object
+                tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+                tmp.write(audio_bytes)
+                tmp.flush()
+                
                 transcript = openai.audio.transcriptions.create(
                     model="whisper-1",
-                    file=audio_file,
+                    file=open(tmp.name, "rb"),
                     response_format="text"
                 )
+                
+                tmp.close()
+                os.unlink(tmp.name)
                 
                 st.session_state.transcribed_text = transcript.strip()
                 st.success(f"✨ I heard: '{transcript.strip()}'")
                 
             except Exception as e:
-                st.error(f"Transcription error: {str(e)}")
-                st.info("Try speaking more clearly or use text search instead.")
+                st.error(f"Transcription error: {e}")
+                st.session_state.transcribed_text = ""
     
-    st.markdown('</div>', unsafe_allow_html=True)
     return st.session_state.transcribed_text
 
 @retry_with_backoff(max_retries=3)
 def search_fashion_items(refined_query, is_vintage):
-    """Search with Perplexity using search_results format - FIXED"""
+    """Query Perplexity, return JSON search_results list."""
     headers = {
         "Authorization": f"Bearer {PPLX_KEY}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
-    
-    # Improved search domains and prompts
-    if is_vintage:
-        search_domains = ["depop.com", "poshmark.com", "therealreal.com"]
-        search_prompt = f"""Find specific vintage/secondhand fashion items for: {refined_query}
 
-I need actual product listings with:
-- Exact product titles and descriptions
-- Current prices in USD
-- Direct links to individual product pages (not category pages)
-- Item condition and authenticity info
-- Specific vintage/secondhand marketplace listings
+    domains = (
+        ["depop.com", "poshmark.com", "therealreal.com"]
+        if is_vintage
+        else ["zara.com", "nordstrom.com", "asos.com"]
+    )
 
-Focus on real products currently for sale on secondhand platforms. Include product page URLs only."""
-    else:
-        search_domains = ["asos.com", "zara.com", "hm.com"]
-        search_prompt = f"""Find specific fashion products for: {refined_query}
+    search_prompt = (
+        f"""Find **buyable** vintage items for: {refined_query}
 
-I need actual product listings with:
-- Exact product names and descriptions  
-- Current retail prices in USD
-- Direct links to individual product pages (not category pages)
-- Size availability and color options
-- Specific items currently in stock
+Return 8 specific product pages with:
+- title
+- direct product URL
+- price (if available)
+- single image URL
+"""
+        if is_vintage
+        else f"""Find **buyable** new fashion items for: {refined_query}
 
-Focus on real products available for purchase. Include product page URLs only."""
-    
-    # FIXED: Use search_results instead of citations
+Return 8 specific product pages with:
+- title
+- direct product URL
+- price (if available)
+- single image URL
+"""
+    )
+
     body = {
         "model": "llama-3.1-sonar-small-128k-online",
         "messages": [{"role": "user", "content": search_prompt}],
-        "return_images": True,  # FIXED: Enable images
-        "search_domain_filter": search_domains,
-        "search_recency_filter": "month"  # Get recent listings
+        "search_domain_filter": domains,
+        "search_results": True,   # NEW format
+        "return_images": True,    # get pictures
     }
-    
-    response = requests.post(
+
+    r = requests.post(
         "https://api.perplexity.ai/chat/completions",
         headers=headers,
         json=body,
-        timeout=30
+        timeout=30,
     )
-    
-    return response
+    r.raise_for_status()
+    return r.json()              # return parsed JSON directly
 
 # Main interface
 st.markdown('<div class="search-container">', unsafe_allow_html=True)
@@ -369,7 +352,9 @@ if st.session_state.search_mode == "text":
     st.markdown('<div class="fashion-tip">💡 <strong>Tip:</strong> Be specific about style, color, or occasion for better results!</div>', unsafe_allow_html=True)
 
 elif st.session_state.search_mode == "voice":
+    st.markdown('<div class="voice-recording">', unsafe_allow_html=True)
     user_query = voice_recorder()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -403,8 +388,7 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
         status_text.text("✨ Curating recommendations...")
         progress_bar.progress(75)
         
-        if response and response.status_code == 200:
-            data = response.json()
+        data = response
             
             progress_bar.progress(100)
             status_text.text("🎉 Your style curation is ready!")
@@ -428,61 +412,40 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
             st.markdown("## 💎 Your Personal Stylist Says:")
             st.markdown(f'<div class="search-container">{ai_response}</div>', unsafe_allow_html=True)
             
-            # FIXED: Product display using search_results
-            if 'search_results' in data and data['search_results']:
-                shop_title = "🌿 Shop Sustainable Finds" if is_vintage else "🛍️ Shop These Picks"
+            # ---------------- Product grid -----------------
+            if data.get("search_results"):
+                shop_title = "🌿 Shop Sustainable Fashion" if is_vintage else "🛍️ Shop These Curated Picks"
                 st.markdown(f"## {shop_title}")
-                
-                # Filter for valid product URLs
-                valid_products = []
-                for result in data['search_results']:
-                    if is_valid_product_url(result.get('url', '')):
-                        valid_products.append(result)
-                
-                if valid_products:
-                    cols = st.columns(2)
-                    
-                    for i, product in enumerate(valid_products[:6]):  # Show max 6 products
-                        col_idx = i % 2
-                        
-                        with cols[col_idx]:
-                            st.markdown('<div class="product-card">', unsafe_allow_html=True)
-                            
-                            # FIXED: Display product image
-                            if product.get('image_url'):
-                                try:
-                                    st.image(product['image_url'], use_column_width=True)
-                                except:
-                                    st.markdown('<div class="product-image" style="display: flex; align-items: center; justify-content: center; color: #999;">📸 Image unavailable</div>', unsafe_allow_html=True)
-                            else:
-                                st.markdown('<div class="product-image" style="display: flex; align-items: center; justify-content: center; color: #999;">📸 No image</div>', unsafe_allow_html=True)
-                            
-                            # Product info
-                            title = product.get('title', 'Fashion Item')
-                            url = product.get('url', '#')
-                            
-                            st.markdown(f"**{title}**")
-                            
-                            # Extract domain for display
-                            try:
-                                domain = url.split('/')[2].replace('www.', '').title()
-                                st.markdown(f"Shop at {domain}")
-                            except:
-                                st.markdown("Shop Now")
-                            
-                            # Shop button
-                            if url and url != '#':
-                                st.link_button("🛍️ Shop This Item", url, use_container_width=True)
-                            
-                            st.markdown('</div>', unsafe_allow_html=True)
-                else:
-                    st.info("No direct product links found. Try a more specific search term.")
-            else:
-                st.info("No products found. Try different search terms or check your internet connection.")
+
+                cols = st.columns(2)
+                for i, prod in enumerate([p for p in data["search_results"] if looks_like_product(p.get("url",""))][:8]):
+                    if not prod.get("url") or not prod.get("title"):
+                        continue  # skip junk
+
+                    with cols[i % 2]:
+                        st.markdown('<div class="product-card">', unsafe_allow_html=True)
+
+                        # image
+                        if prod.get("image_url"):
+                            st.image(prod["image_url"], use_column_width=True)
+
+                        # title & price
+                        st.markdown(f"**{prod['title']}**")
+                        if prod.get("price"):
+                            st.markdown(f"💰 {prod['price']}")
+
+                        # shop button
+                        button_class = "vintage-button" if is_vintage else "shop-button"
+                        emoji = "♻️" if is_vintage else "✨"
+                        st.markdown(
+                            f'<a href="{prod["url"]}" target="_blank" class="{button_class}">{emoji} Shop&nbsp;Now</a>',
+                            unsafe_allow_html=True,
+                        )
+
+                        st.markdown("</div>", unsafe_allow_html=True)
                 
         else:
-            error_code = response.status_code if response else "Network Error"
-            st.error(f"Search temporarily unavailable (Error: {error_code}). Please try again!")
+            st.error("Search temporarily unavailable. Please try again!")
             
     except Exception as e:
         progress_bar.empty()
