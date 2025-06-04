@@ -389,60 +389,59 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
         progress_bar.progress(75)
         
         data = response
+        
+        progress_bar.progress(100)
+        status_text.text("🎉 Your style curation is ready!")
+        # Clear progress
+        time.sleep(1)
+        progress_bar.empty()
+        status_text.empty()
+        
+        # Display search info
+        search_type = "Vintage/Secondhand" if is_vintage else "New Fashion"
+        st.markdown(f"""
+        <div class="search-container">
+            <h3>🎯 {search_type} Search Results</h3>
+            <p style="font-size: 1.1rem; color: #666;">Searched for: "{refined_query}"</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # AI styling advice
+        ai_response = data['choices'][0]['message']['content']
+        st.markdown("## 💎 Your Personal Stylist Says:")
+        st.markdown(f'<div class="search-container">{ai_response}</div>', unsafe_allow_html=True)
             
-            progress_bar.progress(100)
-            status_text.text("🎉 Your style curation is ready!")
-            
-            # Clear progress
-            time.sleep(1)
-            progress_bar.empty()
-            status_text.empty()
-            
-            # Display search info
-            search_type = "Vintage/Secondhand" if is_vintage else "New Fashion"
-            st.markdown(f"""
-            <div class="search-container">
-                <h3>🎯 {search_type} Search Results</h3>
-                <p style="font-size: 1.1rem; color: #666;">Searched for: "{refined_query}"</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # AI styling advice
-            ai_response = data['choices'][0]['message']['content']
-            st.markdown("## 💎 Your Personal Stylist Says:")
-            st.markdown(f'<div class="search-container">{ai_response}</div>', unsafe_allow_html=True)
-            
-            # ---------------- Product grid -----------------
-            if data.get("search_results"):
-                shop_title = "🌿 Shop Sustainable Fashion" if is_vintage else "🛍️ Shop These Curated Picks"
-                st.markdown(f"## {shop_title}")
+        # ---------------- Product grid -----------------
+        if data.get("search_results"):
+            shop_title = "🌿 Shop Sustainable Fashion" if is_vintage else "🛍️ Shop These Curated Picks"
+            st.markdown(f"## {shop_title}")
 
-                cols = st.columns(2)
-                for i, prod in enumerate([p for p in data["search_results"] if looks_like_product(p.get("url",""))][:8]):
-                    if not prod.get("url") or not prod.get("title"):
-                        continue  # skip junk
+            cols = st.columns(2)
+            for i, prod in enumerate([p for p in data["search_results"] if looks_like_product(p.get("url",""))][:8]):
+                if not prod.get("url") or not prod.get("title"):
+                    continue  # skip junk
 
-                    with cols[i % 2]:
-                        st.markdown('<div class="product-card">', unsafe_allow_html=True)
+                with cols[i % 2]:
+                    st.markdown('<div class="product-card">', unsafe_allow_html=True)
 
-                        # image
-                        if prod.get("image_url"):
-                            st.image(prod["image_url"], use_column_width=True)
+                    # image
+                    if prod.get("image_url"):
+                        st.image(prod["image_url"], use_column_width=True)
 
-                        # title & price
-                        st.markdown(f"**{prod['title']}**")
-                        if prod.get("price"):
-                            st.markdown(f"💰 {prod['price']}")
+                    # title & price
+                    st.markdown(f"**{prod['title']}**")
+                    if prod.get("price"):
+                        st.markdown(f"💰 {prod['price']}")
 
-                        # shop button
-                        button_class = "vintage-button" if is_vintage else "shop-button"
-                        emoji = "♻️" if is_vintage else "✨"
-                        st.markdown(
-                            f'<a href="{prod["url"]}" target="_blank" class="{button_class}">{emoji} Shop&nbsp;Now</a>',
-                            unsafe_allow_html=True,
-                        )
+                    # shop button
+                    button_class = "vintage-button" if is_vintage else "shop-button"
+                    emoji = "♻️" if is_vintage else "✨"
+                    st.markdown(
+                        f'<a href="{prod["url"]}" target="_blank" class="{button_class}">{emoji} Shop&nbsp;Now</a>',
+                        unsafe_allow_html=True,
+                    )
 
-                        st.markdown("</div>", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
                 
         else:
             st.error("Search temporarily unavailable. Please try again!")
