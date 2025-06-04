@@ -410,11 +410,31 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
         ai_response = data['choices'][0]['message']['content']
         st.markdown("## 💎 Your Personal Stylist Says:")
         st.markdown(f'<div class="search-container">{ai_response}</div>', unsafe_allow_html=True)
+        
+        # Debug: Show raw API response structure
+        with st.expander("🔍 Debug: Raw API Response"):
+            st.write("**Full API Response Keys:**")
+            st.write(list(data.keys()))
+            if 'search_results' in data:
+                st.write(f"**Search Results Count:** {len(data['search_results'])}")
+                if data['search_results']:
+                    st.write("**First Search Result Structure:**")
+                    st.json(data['search_results'][0])
+            else:
+                st.write("❌ No 'search_results' key found in response")
             
         # ---------------- Product grid -----------------
         if data.get("search_results"):
             shop_title = "🌿 Shop Sustainable Fashion" if is_vintage else "🛍️ Shop These Curated Picks"
             st.markdown(f"## {shop_title}")
+
+            # Debug: Show what we're getting from Perplexity
+            st.write("**Debug - Search Results:**")
+            st.write(f"Found {len(data['search_results'])} results")
+            for i, result in enumerate(data['search_results'][:3]):
+                st.write(f"Result {i+1}: {result.keys()}")
+                if result.get('image_url'):
+                    st.write(f"  - Image URL: {result['image_url'][:100]}...")
 
             cols = st.columns(2)
             for i, prod in enumerate([p for p in data["search_results"] if looks_like_product(p.get("url",""))][:8]):
@@ -424,9 +444,19 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
                 with cols[i % 2]:
                     st.markdown('<div class="product-card">', unsafe_allow_html=True)
 
-                    # image
-                    if prod.get("image_url"):
-                        st.image(prod["image_url"], use_column_width=True)
+                    # Enhanced image handling with debugging
+                    image_url = prod.get("image_url") or prod.get("image") or prod.get("thumbnail")
+                    if image_url:
+                        st.write(f"**Debug:** Trying to load image: {image_url[:50]}...")
+                        try:
+                            st.image(image_url, use_column_width=True)
+                            st.write("✅ Image loaded successfully")
+                        except Exception as e:
+                            st.write(f"❌ Image failed to load: {e}")
+                            st.markdown("📸 **Image unavailable**")
+                    else:
+                        st.write("❌ No image URL found in data")
+                        st.markdown("📸 **No image provided**")
 
                     # title & price
                     st.markdown(f"**{prod['title']}**")
