@@ -431,6 +431,10 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
             # Get images from separate images array
             images = data.get("images", [])
             st.write(f"**Debug:** Found {len(images)} images in separate images array")
+            
+            # Debug: Show first few images
+            for j, img in enumerate(images[:3]):
+                st.write(f"Image {j}: {str(img)[:100] if img else 'None'}")
 
             cols = st.columns(2)
             for i, prod in enumerate([p for p in data["search_results"] if looks_like_product(p.get("url",""))][:8]):
@@ -442,19 +446,19 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
 
                     # Try to get image from images array by index
                     image_url = None
-                    if i < len(images):
+                    if i < len(images) and images[i] is not None:
                         image_url = images[i]
-                        st.write(f"**Debug:** Using image {i}: {image_url[:50] if image_url else 'None'}...")
+                        st.write(f"**Debug:** Using image {i}: {str(image_url)[:50]}...")
                     
                     if image_url:
                         try:
                             st.image(image_url, use_column_width=True)
                             st.write("✅ Image loaded successfully")
                         except Exception as e:
-                            st.write(f"❌ Image failed to load: {e}")
+                            st.write(f"❌ Image failed to load: {str(e)}")
                             st.markdown("📸 **Image unavailable**")
                     else:
-                        st.write("❌ No image available for this index")
+                        st.write(f"❌ No image available for index {i}")
                         st.markdown("📸 **No image provided**")
 
                     # title & price
