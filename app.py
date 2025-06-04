@@ -292,7 +292,8 @@ def voice_recorder():
         mediaRecorder.start();
     });
     """
-    result = streamlit_js_eval(js_code=js, key="voice_js")
+   
+    result = streamlit_js_eval(js_expressions=js, key="voice_js", want_output=True)
 
     # 2️⃣  Handle errors / user cancellation
     if not result or result.get("err"):
@@ -496,7 +497,7 @@ Include product details like colors, sizes available, and key features."""
                     or fetch_og_image(link_url)
                     or unsplash_fallback(refined_query)
                     )
-
+                    
                     button_css = "vintage-button" if is_vintage else "shop-button"
                     button_icn = "♻️" if is_vintage else "✨"
 
