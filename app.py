@@ -410,18 +410,6 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
         ai_response = data['choices'][0]['message']['content']
         st.markdown("## 💎 Your Personal Stylist Says:")
         st.markdown(f'<div class="search-container">{ai_response}</div>', unsafe_allow_html=True)
-        
-        # Debug: Show raw API response structure
-        with st.expander("🔍 Debug: Raw API Response"):
-            st.write("**Full API Response Keys:**")
-            st.write(list(data.keys()))
-            if 'search_results' in data:
-                st.write(f"**Search Results Count:** {len(data['search_results'])}")
-                if data['search_results']:
-                    st.write("**First Search Result Structure:**")
-                    st.json(data['search_results'][0])
-            else:
-                st.write("❌ No 'search_results' key found in response")
             
         # ---------------- Product grid -----------------
         if data.get("search_results"):
@@ -430,14 +418,6 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
 
             # Get images from separate images array
             images = data.get("images", [])
-            st.write(f"**Debug:** Found {len(images)} images in separate images array")
-            
-            # Debug: Show first few images and their structure
-            for j, img in enumerate(images[:3]):
-                if isinstance(img, dict) and 'image_url' in img:
-                    st.write(f"Image {j}: {img['image_url'][:80]}...")
-                else:
-                    st.write(f"Image {j}: {str(img)[:80]}...")
 
             cols = st.columns(2)
             for i, prod in enumerate([p for p in data["search_results"] if looks_like_product(p.get("url",""))][:8]):
@@ -455,19 +435,14 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
                             image_url = img_data['image_url']
                         elif isinstance(img_data, str):
                             image_url = img_data
-                        
-                        st.write(f"**Debug:** Using image {i}: {str(image_url)[:50]}...")
                     
                     if image_url:
                         try:
                             st.image(image_url, use_column_width=True)
-                            st.write("✅ Image loaded successfully")
-                        except Exception as e:
-                            st.write(f"❌ Image failed to load: {str(e)}")
-                            st.markdown("📸 **Image unavailable**")
+                        except:
+                            st.markdown('<div style="height: 200px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; border-radius: 10px; color: #999;">📸 Image unavailable</div>', unsafe_allow_html=True)
                     else:
-                        st.write(f"❌ No valid image URL for index {i}")
-                        st.markdown("📸 **No image provided**")
+                        st.markdown('<div style="height: 200px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; border-radius: 10px; color: #999;">📸 No image</div>', unsafe_allow_html=True)
 
                     # title & price
                     st.markdown(f"**{prod['title']}**")
