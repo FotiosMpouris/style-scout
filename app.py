@@ -7,6 +7,7 @@ from PIL import Image
 import io
 import base64
 import time
+from st_audiorec import st_audiorec
 
 # Page configuration with fashion-forward styling
 st.set_page_config(
@@ -135,37 +136,6 @@ st.markdown("""
         border: 1px solid rgba(255,255,255,0.3);
     }
     
-    .recording-button {
-        background: linear-gradient(45deg, #4ecdc4, #44a08d);
-        color: white;
-        border: none;
-        padding: 1.5rem 3rem;
-        border-radius: 50px;
-        font-weight: 600;
-        font-size: 1.2rem;
-        margin: 1rem;
-        transition: all 0.3s ease;
-        cursor: pointer;
-        box-shadow: 0 5px 20px rgba(78,205,196,0.3);
-    }
-    
-    .recording-button:hover {
-        background: linear-gradient(45deg, #26d0ce, #2a5c5a);
-        transform: translateY(-3px);
-        box-shadow: 0 8px 25px rgba(78,205,196,0.4);
-    }
-    
-    .recording-active {
-        background: linear-gradient(45deg, #ff6b6b, #ff8e8e) !important;
-        animation: pulse 1.5s infinite;
-    }
-    
-    @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.05); }
-        100% { transform: scale(1); }
-    }
-    
     .stTextInput > div > div > input {
         border-radius: 15px;
         border: 2px solid rgba(255,255,255,0.3);
@@ -224,10 +194,10 @@ st.markdown("""
 # Initialize session state
 if 'search_mode' not in st.session_state:
     st.session_state.search_mode = "text"
-if 'audio_data' not in st.session_state:
-    st.session_state.audio_data = None
 if 'transcribed_text' not in st.session_state:
     st.session_state.transcribed_text = ""
+if 'voice_search_triggered' not in st.session_state:
+    st.session_state.voice_search_triggered = False
 
 # Header section
 st.markdown("""
@@ -257,85 +227,254 @@ def is_vintage_search(query):
     query_lower = query.lower()
     return any(keyword in query_lower for keyword in vintage_keywords)
 
-# Extract product info from text
-def extract_product_info(text):
-    """Extract structured product information from AI response"""
-    products = []
-    sections = re.split(r'\n\s*\n|\d+\.\s+|\*\*|\#\#', text)
-    
-    for section in sections:
-        if len(section.strip()) < 20:
-            continue
-            
-        price_match = re.search(r'\$[\d,]+(?:\.\d{2})?', section)
-        price = price_match.group() if price_match else None
-        
-        url_match = re.search(r'https?://[^\s<>"]+', section)
-        url = url_match.group() if url_match else None
-        
-        lines = [line.strip() for line in section.split('\n') if line.strip()]
-        title = lines[0] if lines else section[:100] + "..."
-        
-        title = re.sub(r'^[\d\.\-\*\s]+', '', title)
-        title = re.sub(r'\*+', '', title)
-        title = title.strip()
-        
-        if title and len(title) > 5:
-            products.append({
-                'title': title,
-                'price': price,
-                'url': url,
-                'description': section.strip()
-            })
-    
-    return products[:6]
-
-# Voice recording component
+# Voice recording function - STREAMLINED VERSION
 def voice_recorder():
-    """Create voice recording interface"""
+    """Record audio from mic → Whisper → text."""
     st.markdown('<div class="voice-recording">', unsafe_allow_html=True)
     st.markdown("### 🎙️ Voice Fashion Search")
-    st.markdown("Click to record your fashion request:")
-    
-    # Audio recorder using st.audio_input (available in newer Streamlit versions)
-    audio_file = st.file_uploader("Record or upload audio", type=['wav', 'mp3', 'm4a'], key="audio_upload")
-    
-    if audio_file is not None:
-        st.audio(audio_file)
-        
-        if st.button("🔄 Transcribe Audio", key="transcribe_btn"):
-            with st.spinner("🎧 Transcribing your voice..."):
-                try:
-                    # Prepare audio file for OpenAI Whisper
-                    audio_bytes = audio_file.read()
-                    
-                    # Create a temporary file-like object
-                    audio_file_obj = io.BytesIO(audio_bytes)
-                    audio_file_obj.name = "audio.wav"
-                    
-                    # Transcribe with OpenAI Whisper
-                    transcript = openai.audio.transcriptions.create(
-                        model="whisper-1",
-                        file=audio_file_obj,
-                        response_format="text"
-                    )
-                    
-                    st.session_state.transcribed_text = transcript
-                    st.success(f"✨ I heard: '{transcript}'")
-                    
-                except Exception as e:
-                    st.error(f"Transcription error: {str(e)}")
-    
-    # Manual voice input as backup
-    st.markdown("**Or type what you would say:**")
-    manual_voice = st.text_input("", placeholder="Type your voice search here...", key="manual_voice")
-    
-    if manual_voice:
-        st.session_state.transcribed_text = manual_voice
-    
+    st.markdown("Click the microphone to start recording. Speak your fashion request!")
+
+    audio_bytes = st_audiorec()  # returns None until the user clicks Stop
+
+    if audio_bytes is not None:
+        st.audio(audio_bytes, format="audio/wav")
+
+        with st.spinner("🔊 Transcribing your voice..."):
+            # Whisper needs a file-like object
+            wav_io = io.BytesIO(audio_bytes)
+            wav_io.name = "speech.wav"
+
+            transcript = openai.audio.transcriptions.create(
+                model="whisper-1",
+                file=wav_io,
+                response_format="text"
+            ).text
+
+        st.session_state.transcribed_text = transcript
+        st.session_state.voice_search_triggered = True
+        st.success(f"✨ I heard: '{transcript}'")
+        st.rerun()  # Trigger immediate search
+
     st.markdown('</div>', unsafe_allow_html=True)
+    return st.session_state.get("transcribed_text", "")
+
+# Perform the actual search function
+def perform_fashion_search(user_query):
+    """Perform the fashion search with given query"""
+    # Check if this is a vintage/secondhand search
+    is_vintage = is_vintage_search(user_query)
     
-    return st.session_state.transcribed_text
+    if is_vintage:
+        st.markdown('<div class="vintage-indicator">🌿 Sustainable Fashion Search Detected</div>', unsafe_allow_html=True)
+    
+    # Progress tracking
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    status_text.text("🧠 AI is analyzing your style preferences...")
+    progress_bar.progress(25)
+    
+    try:
+        # Step 1: Refine query with fashion expertise
+        if is_vintage:
+            system_prompt = """You are an expert vintage fashion curator and sustainable style consultant. The user is looking for secondhand, vintage, or pre-owned fashion items. Convert their request into search terms that work well for vintage/secondhand platforms like Depop, Poshmark, eBay, TheRealReal, Vestiaire Collective, and ThredUp.
+
+Consider:
+- Vintage eras and specific style periods (90s, Y2K, 70s boho, etc.)
+- Designer brands that hold value in resale markets
+- Condition descriptions (excellent, good, fair)
+- Authentication concerns for luxury items
+- Size variations in vintage clothing
+- Sustainable fashion terminology
+
+Format for secondhand platforms. Include era, style descriptors, and brand suggestions.
+
+Examples:
+- "something like Kurt Cobain wore" → "vintage 90s grunge flannel band tee leather jacket"
+- "designer bag but affordable" → "pre-owned luxury handbag Kate Spade Coach vintage"
+- "retro dress for date night" → "vintage midi dress 70s boho or 90s slip dress"
+
+Keep it focused and under 15 words."""
+        else:
+            system_prompt = """You are an expert fashion stylist and personal shopper with deep knowledge of current trends, designers, and shopping. Convert the user's fashion request into a sophisticated search strategy that captures both their style preferences and practical shopping needs.
+
+Consider:
+- Current fashion trends and seasonal appropriateness
+- Price points and value for money
+- Versatility and styling potential
+- Brand recommendations for different budgets
+- Specific product details that matter (fit, fabric, etc.)
+
+Format your refined search to work well with online shopping searches. Include key descriptive terms, style categories, and any mentioned price ranges.
+
+Examples:
+- "something trendy for dates" → "date night outfit women trendy 2024 midi dress or cute top"
+- "professional but not boring" → "modern business casual women blazer contemporary work outfit"
+- "like what Bella Hadid wears off-duty" → "model off duty street style oversized blazer vintage jeans"
+
+Keep it focused and under 15 words."""
+
+        chat_response = openai.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_query}
+            ],
+            temperature=0.4,
+            max_tokens=100
+        )
+        
+        refined_query = chat_response.choices[0].message.content.strip()
+        
+        status_text.text("🔍 Searching the best fashion retailers...")
+        progress_bar.progress(50)
+        
+        # Step 2: Choose search domains based on vintage detection
+        if is_vintage:
+            search_domains = [
+                "depop.com", "poshmark.com", "ebay.com", "therealreal.com",
+                "vestiairecollective.com", "thredup.com", "rebag.com",
+                "fashionphile.com", "tradesy.com", "vinted.com"
+            ]
+            search_focus = "vintage, secondhand, and pre-owned fashion platforms"
+        else:
+            search_domains = [
+                "zara.com", "hm.com", "nordstrom.com", "asos.com", 
+                "urbanoutfitters.com", "target.com", "amazon.com",
+                "mango.com", "revolve.com", "shopbop.com"
+            ]
+            search_focus = "trusted fashion retailers"
+        
+        # Search with Perplexity
+        headers = {
+            "Authorization": f"Bearer {PPLX_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        if is_vintage:
+            search_prompt = f"""Find specific vintage/secondhand clothing items for: {refined_query}
+
+Please provide:
+1. Specific vintage or pre-owned items with detailed descriptions
+2. Estimated price ranges for secondhand market
+3. Direct links from secondhand platforms like Depop, Poshmark, eBay, TheRealReal, ThredUp, Vestiaire Collective
+4. Tips for buying vintage/secondhand (sizing, authenticity, condition)
+5. Era identification and styling suggestions
+
+Focus on sustainable fashion and secondhand marketplaces. Include authentication tips for designer items."""
+        else:
+            search_prompt = f"""Find specific clothing items for: {refined_query}
+
+Please provide:
+1. Specific product recommendations with exact names and descriptions
+2. Price ranges when available  
+3. Direct shopping links from reputable retailers
+4. Brief styling suggestions
+
+Focus on these trusted retailers: Zara, H&M, Nordstrom, ASOS, Urban Outfitters, Target, Amazon Fashion, Mango, and similar popular fashion sites.
+
+Include product details like colors, sizes available, and key features."""
+        
+        body = {
+            "model": "llama-3.1-sonar-small-128k-online",
+            "messages": [{"role": "user", "content": search_prompt}],
+            "return_citations": True,
+            "return_images": True,  # ENABLE IMAGES!
+            "search_domain_filter": search_domains
+        }
+        
+        status_text.text("✨ Curating your personalized style recommendations...")
+        progress_bar.progress(75)
+        
+        response = requests.post(
+            "https://api.perplexity.ai/chat/completions",
+            headers=headers,
+            json=body,
+            timeout=30
+        )
+        
+        progress_bar.progress(100)
+        status_text.text("🎉 Your style curation is ready!")
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Clear progress indicators
+            progress_bar.empty()
+            status_text.empty()
+            
+            # Display refined search
+            search_type = "Vintage/Secondhand" if is_vintage else "New Fashion"
+            st.markdown(f"""
+            <div class="search-container">
+                <h3>🎯 Your {search_type} Search</h3>
+                <p style="font-size: 1.1rem; color: #666; font-style: italic;">"{refined_query}"</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Get AI response
+            ai_response = data['choices'][0]['message']['content']
+            
+            # Display AI styling advice
+            advisor_title = "💎 Your Vintage Curator Says:" if is_vintage else "💎 Your Personal Stylist Says:"
+            st.markdown(f"## {advisor_title}")
+            st.markdown(f'<div class="search-container">{ai_response}</div>', unsafe_allow_html=True)
+            
+            # Display shopping links with IMAGES in a beautiful grid
+            if 'citations' in data and data['citations']:
+                shop_title = "🌿 Shop Sustainable Fashion" if is_vintage else "🛍️ Shop These Curated Picks"
+                st.markdown(f"## {shop_title}")
+                
+                # Create columns for product grid
+                cols = st.columns(2)
+                
+                for i, citation in enumerate(data['citations'][:8]):
+                    col = cols[i % 2]
+
+                    # Perplexity's citation object now has title, url, and (when available) image_url
+                    img_url = citation.get("image_url")
+                    title_txt = citation.get("title", "See product")
+                    link_url = citation["url"]
+
+                    button_css = "vintage-button" if is_vintage else "shop-button"
+                    button_icn = "♻️" if is_vintage else "✨"
+
+                    with col:
+                        st.markdown('<div class="product-card">', unsafe_allow_html=True)
+
+                        if img_url:
+                            st.image(img_url, use_column_width=True)
+
+                        st.markdown(f"**{title_txt}**", unsafe_allow_html=True)
+                        st.markdown(
+                            f'<a href="{link_url}" target="_blank" class="{button_css}">{button_icn} Shop&nbsp;Now</a>',
+                            unsafe_allow_html=True
+                        )
+                        st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Fashion advice section
+            if is_vintage:
+                st.markdown("""
+                ## 🌿 Sustainable Shopping Tips
+                <div class="fashion-tip">
+                    <strong>Vintage Curator's Note:</strong> Always check measurements rather than size labels for vintage pieces. Ask sellers about condition, authenticity for designer items, and return policies. Vintage sizing runs smaller than modern!
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                ## 💫 Styling Tips
+                <div class="fashion-tip">
+                    <strong>Stylist's Note:</strong> Remember to check size guides carefully, and don't be afraid to mix high and low-end pieces. The best outfits often combine investment pieces with trendy, affordable finds!
+                </div>
+                """, unsafe_allow_html=True)
+            
+        else:
+            st.error(f"Search temporarily unavailable (Error: {response.status_code}). Please try again!")
+            
+    except Exception as e:
+        progress_bar.empty()
+        status_text.empty()
+        st.error(f"Oops! Something went wrong: {str(e)}")
 
 # Fashion tips
 fashion_tips = [
@@ -356,10 +495,12 @@ col1, col2 = st.columns([1, 1])
 with col1:
     if st.button("💬 Text Search", use_container_width=True):
         st.session_state.search_mode = "text"
+        st.session_state.voice_search_triggered = False
 
 with col2:
     if st.button("🎙️ Voice Search", use_container_width=True):
         st.session_state.search_mode = "voice"
+        st.session_state.voice_search_triggered = False
 
 user_query = ""
 
@@ -380,222 +521,15 @@ elif st.session_state.search_mode == "voice":
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Search button and processing
-if st.button("🔍 Find My Perfect Style!", disabled=not user_query, use_container_width=True, key="main_search"):
+# Handle automatic voice search OR manual search button
+if st.session_state.get('voice_search_triggered', False) and user_query:
+    # Auto-trigger search after voice transcription
+    st.session_state.voice_search_triggered = False
+    perform_fashion_search(user_query)
+elif st.button("🔍 Find My Perfect Style!", disabled=not user_query, use_container_width=True, key="main_search"):
+    # Manual search button for text searches
     if user_query:
-        # Check if this is a vintage/secondhand search
-        is_vintage = is_vintage_search(user_query)
-        
-        if is_vintage:
-            st.markdown('<div class="vintage-indicator">🌿 Sustainable Fashion Search Detected</div>', unsafe_allow_html=True)
-        
-        # Progress tracking
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        
-        status_text.text("🧠 AI is analyzing your style preferences...")
-        progress_bar.progress(25)
-        
-        try:
-            # Step 1: Refine query with fashion expertise
-            if is_vintage:
-                system_prompt = """You are an expert vintage fashion curator and sustainable style consultant. The user is looking for secondhand, vintage, or pre-owned fashion items. Convert their request into search terms that work well for vintage/secondhand platforms like Depop, Poshmark, eBay, TheRealReal, Vestiaire Collective, and ThredUp.
-
-Consider:
-- Vintage eras and specific style periods (90s, Y2K, 70s boho, etc.)
-- Designer brands that hold value in resale markets
-- Condition descriptions (excellent, good, fair)
-- Authentication concerns for luxury items
-- Size variations in vintage clothing
-- Sustainable fashion terminology
-
-Format for secondhand platforms. Include era, style descriptors, and brand suggestions.
-
-Examples:
-- "something like Kurt Cobain wore" → "vintage 90s grunge flannel band tee leather jacket"
-- "designer bag but affordable" → "pre-owned luxury handbag Kate Spade Coach vintage"
-- "retro dress for date night" → "vintage midi dress 70s boho or 90s slip dress"
-
-Keep it focused and under 15 words."""
-            else:
-                system_prompt = """You are an expert fashion stylist and personal shopper with deep knowledge of current trends, designers, and shopping. Convert the user's fashion request into a sophisticated search strategy that captures both their style preferences and practical shopping needs.
-
-Consider:
-- Current fashion trends and seasonal appropriateness
-- Price points and value for money
-- Versatility and styling potential
-- Brand recommendations for different budgets
-- Specific product details that matter (fit, fabric, etc.)
-
-Format your refined search to work well with online shopping searches. Include key descriptive terms, style categories, and any mentioned price ranges.
-
-Examples:
-- "something trendy for dates" → "date night outfit women trendy 2024 midi dress or cute top"
-- "professional but not boring" → "modern business casual women blazer contemporary work outfit"
-- "like what Bella Hadid wears off-duty" → "model off duty street style oversized blazer vintage jeans"
-
-Keep it focused and under 15 words."""
-
-            chat_response = openai.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_query}
-                ],
-                temperature=0.4,
-                max_tokens=100
-            )
-            
-            refined_query = chat_response.choices[0].message.content.strip()
-            
-            status_text.text("🔍 Searching the best fashion retailers...")
-            progress_bar.progress(50)
-            
-            # Step 2: Choose search domains based on vintage detection
-            if is_vintage:
-                search_domains = [
-                    "depop.com", "poshmark.com", "ebay.com", "therealreal.com",
-                    "vestiairecollective.com", "thredup.com", "rebag.com",
-                    "fashionphile.com", "tradesy.com", "vinted.com"
-                ]
-                search_focus = "vintage, secondhand, and pre-owned fashion platforms"
-            else:
-                search_domains = [
-                    "zara.com", "hm.com", "nordstrom.com", "asos.com", 
-                    "urbanoutfitters.com", "target.com", "amazon.com",
-                    "mango.com", "revolve.com", "shopbop.com"
-                ]
-                search_focus = "trusted fashion retailers"
-            
-            # Search with Perplexity
-            headers = {
-                "Authorization": f"Bearer {PPLX_KEY}",
-                "Content-Type": "application/json"
-            }
-            
-            if is_vintage:
-                search_prompt = f"""Find specific vintage/secondhand clothing items for: {refined_query}
-
-Please provide:
-1. Specific vintage or pre-owned items with detailed descriptions
-2. Estimated price ranges for secondhand market
-3. Direct links from secondhand platforms like Depop, Poshmark, eBay, TheRealReal, ThredUp, Vestiaire Collective
-4. Tips for buying vintage/secondhand (sizing, authenticity, condition)
-5. Era identification and styling suggestions
-
-Focus on sustainable fashion and secondhand marketplaces. Include authentication tips for designer items."""
-            else:
-                search_prompt = f"""Find specific clothing items for: {refined_query}
-
-Please provide:
-1. Specific product recommendations with exact names and descriptions
-2. Price ranges when available  
-3. Direct shopping links from reputable retailers
-4. Brief styling suggestions
-
-Focus on these trusted retailers: Zara, H&M, Nordstrom, ASOS, Urban Outfitters, Target, Amazon Fashion, Mango, and similar popular fashion sites.
-
-Include product details like colors, sizes available, and key features."""
-            
-            body = {
-                "model": "llama-3.1-sonar-small-128k-online",
-                "messages": [{"role": "user", "content": search_prompt}],
-                "return_citations": True,
-                "return_images": False,
-                "search_domain_filter": search_domains
-            }
-            
-            status_text.text("✨ Curating your personalized style recommendations...")
-            progress_bar.progress(75)
-            
-            response = requests.post(
-                "https://api.perplexity.ai/chat/completions",
-                headers=headers,
-                json=body,
-                timeout=30
-            )
-            
-            progress_bar.progress(100)
-            status_text.text("🎉 Your style curation is ready!")
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Clear progress indicators
-                progress_bar.empty()
-                status_text.empty()
-                
-                # Display refined search
-                search_type = "Vintage/Secondhand" if is_vintage else "New Fashion"
-                st.markdown(f"""
-                <div class="search-container">
-                    <h3>🎯 Your {search_type} Search</h3>
-                    <p style="font-size: 1.1rem; color: #666; font-style: italic;">"{refined_query}"</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Get AI response
-                ai_response = data['choices'][0]['message']['content']
-                
-                # Display AI styling advice
-                advisor_title = "💎 Your Vintage Curator Says:" if is_vintage else "💎 Your Personal Stylist Says:"
-                st.markdown(f"## {advisor_title}")
-                st.markdown(f'<div class="search-container">{ai_response}</div>', unsafe_allow_html=True)
-                
-                # Display shopping links in a beautiful grid
-                if 'citations' in data and data['citations']:
-                    shop_title = "🌿 Shop Sustainable Fashion" if is_vintage else "🛍️ Shop These Curated Picks"
-                    st.markdown(f"## {shop_title}")
-                    
-                    # Create columns for product grid
-                    cols = st.columns(2)
-                    
-                    for i, citation in enumerate(data['citations'][:8]):
-                        col_idx = i % 2
-                        
-                        with cols[col_idx]:
-                            # Extract domain for styling
-                            domain = citation.split('/')[2].replace('www.', '').title()
-                            
-                            # Choose button style based on platform type
-                            button_class = "vintage-button" if is_vintage else "shop-button"
-                            button_emoji = "♻️" if is_vintage else "✨"
-                            
-                            st.markdown(f"""
-                            <div class="product-card">
-                                <div class="product-title">Shop at {domain}</div>
-                                <a href="{citation}" target="_blank" class="{button_class}">
-                                    {button_emoji} Shop Now
-                                </a>
-                                <div style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">
-                                    {citation[:50]}...
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                
-                # Fashion advice section
-                if is_vintage:
-                    st.markdown("""
-                    ## 🌿 Sustainable Shopping Tips
-                    <div class="fashion-tip">
-                        <strong>Vintage Curator's Note:</strong> Always check measurements rather than size labels for vintage pieces. Ask sellers about condition, authenticity for designer items, and return policies. Vintage sizing runs smaller than modern!
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown("""
-                    ## 💫 Styling Tips
-                    <div class="fashion-tip">
-                        <strong>Stylist's Note:</strong> Remember to check size guides carefully, and don't be afraid to mix high and low-end pieces. The best outfits often combine investment pieces with trendy, affordable finds!
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-            else:
-                st.error(f"Search temporarily unavailable (Error: {response.status_code}). Please try again!")
-                
-        except Exception as e:
-            progress_bar.empty()
-            status_text.empty()
-            st.error(f"Oops! Something went wrong: {str(e)}")
+        perform_fashion_search(user_query)
 
 # Footer with style
 st.markdown("""
