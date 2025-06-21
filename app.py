@@ -16,68 +16,89 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Custom CSS - Simplified and cleaner
+# --- NEW CUSTOM CSS ---
+# Updated with the "Brown and Cream" color palette
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600&display=swap');
     
+    /* Palette Variables from the image */
+    :root {
+        --cream: #F0E6D0;
+        --caramel: #C3895D;
+        --coffee: #956737;
+        --brownie: #5E3D23;
+        --dark-bg: #3D2C1D; /* A deep brown for the main background */
+    }
+
+    /* Main App Background */
     .stApp {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
+        background-color: var(--dark-bg);
+    }
+
+    /* General text color for readability on dark background */
+    h1, h2, h3, h4, h5, h6, p, li, .st-emotion-cache-16idsys p {
+        color: var(--cream);
     }
     
+    /* Main Header Block */
     .main-header {
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(20px);
+        background: rgba(240, 230, 208, 0.05); /* Transparent Cream */
+        backdrop-filter: blur(15px);
         border-radius: 20px;
         padding: 2rem;
         margin: 1rem 0 2rem 0;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
         text-align: center;
-        border: 1px solid rgba(255,255,255,0.2);
+        border: 1px solid rgba(240, 230, 208, 0.15); /* Cream border */
     }
     
+    /* Main Title: "Style Scout" */
     .main-title {
         font-family: 'Playfair Display', serif;
         font-size: 3rem;
         font-weight: 700;
-        background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        color: var(--caramel); /* Caramel color for the title */
         margin-bottom: 0.5rem;
     }
     
+    /* Subtitle text */
     .subtitle {
         font-family: 'Inter', sans-serif;
         font-size: 1.1rem;
-        color: #666;
+        color: var(--cream);
+        opacity: 0.8;
         font-weight: 300;
         margin-bottom: 1rem;
     }
     
-    .search-container {
-        background: rgba(255, 255, 255, 0.9);
+    /* Containers for search, results, etc. */
+    .search-container, .voice-recording {
+        background: rgba(240, 230, 208, 0.05); /* Transparent Cream */
         backdrop-filter: blur(15px);
         border-radius: 15px;
         padding: 2rem;
         margin: 1rem 0;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-        border: 1px solid rgba(255,255,255,0.3);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        border: 1px solid rgba(240, 230, 208, 0.15);
     }
     
+    /* Product Card */
     .product-card {
-        background: rgba(255, 255, 255, 0.95);
+        background: rgba(240, 230, 208, 0.1);
         backdrop-filter: blur(10px);
         border-radius: 15px;
         padding: 1.5rem;
         margin: 1rem 0;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-        border: 1px solid rgba(255,255,255,0.2);
-        transition: transform 0.3s ease;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        border: 1px solid rgba(240, 230, 208, 0.2);
+        transition: transform 0.3s ease, background 0.3s ease;
+        color: var(--cream); /* Text inside the card should be light */
     }
     
     .product-card:hover {
         transform: translateY(-5px);
+        background: rgba(240, 230, 208, 0.2);
     }
     
     .product-image {
@@ -86,39 +107,80 @@ st.markdown("""
         height: 200px;
         object-fit: cover;
         margin-bottom: 1rem;
-        background: #f0f0f0;
     }
     
-    .voice-recording {
-        background: rgba(255, 255, 255, 0.9);
-        backdrop-filter: blur(15px);
-        border-radius: 15px;
-        padding: 2rem;
-        margin: 1rem 0;
-        text-align: center;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-    }
-    
+    /* Vintage Indicator Badge */
     .vintage-indicator {
-        background: linear-gradient(45deg, #8B4513, #D2691E);
-        color: white;
+        background: linear-gradient(45deg, var(--coffee), var(--caramel));
+        color: var(--cream);
         padding: 0.5rem 1rem;
         border-radius: 20px;
         font-size: 0.9rem;
         font-weight: 600;
         margin: 0.5rem 0;
         display: inline-block;
+        border: 1px solid rgba(240, 230, 208, 0.3);
     }
     
+    /* Fashion Tip Box */
     .fashion-tip {
-        background: rgba(255, 255, 255, 0.9);
-        backdrop-filter: blur(10px);
-        border-left: 4px solid #ff6b6b;
+        background: transparent;
+        border-left: 4px solid var(--caramel); /* Caramel accent border */
         padding: 1rem;
         border-radius: 0 10px 10px 0;
         margin: 1rem 0;
         font-style: italic;
-        color: #555;
+        color: var(--cream);
+        opacity: 0.9;
+    }
+
+    /* Style for custom "Shop Now" links */
+    .shop-button, .vintage-button {
+        display: inline-block;
+        width: 100%;
+        padding: 0.75rem 1rem;
+        margin-top: 1rem;
+        border-radius: 8px;
+        background-color: var(--caramel);
+        color: var(--brownie) !important; /* Dark text on caramel button */
+        font-weight: 600;
+        text-align: center;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+
+    .shop-button:hover, .vintage-button:hover {
+        background-color: var(--coffee);
+        color: var(--cream) !important;
+        text-decoration: none;
+    }
+    
+    /* Style for main Streamlit buttons */
+    .stButton > button {
+        background-color: var(--caramel);
+        color: var(--brownie);
+        border: 1px solid transparent;
+        border-radius: 8px;
+        font-weight: 600;
+        padding: 0.75rem;
+    }
+    .stButton > button:hover {
+        background-color: var(--coffee);
+        color: var(--cream);
+        border: 1px solid var(--coffee);
+    }
+    .stButton > button:disabled {
+        background-color: rgba(149, 103, 55, 0.5); /* Dimmed Coffee */
+        color: rgba(240, 230, 208, 0.5); /* Dimmed Cream */
+        border-color: transparent;
+    }
+
+    /* Style for text input */
+    .stTextInput > div > div > input {
+        background-color: rgba(240, 230, 208, 0.1);
+        color: var(--cream);
+        border: 1px solid rgba(240, 230, 208, 0.2);
+        border-radius: 8px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -232,11 +294,11 @@ def voice_recorder():
     """Record from mic, transcribe with Whisper, return text."""
     st.markdown("### 🎙️ Voice Fashion Search")
     
-    # Clean microphone interface - just the button
+    # --- UPDATED VOICE RECORDER COLORS ---
     audio_bytes = audio_recorder(
         text="🎤",
-        recording_color="#ff6b6b",
-        neutral_color="#667eea", 
+        recording_color="#956737",  # Coffee
+        neutral_color="#C3895D",    # Caramel
         icon_name="microphone",
         icon_size="2x",
         pause_threshold=2.0,
@@ -249,7 +311,6 @@ def voice_recorder():
                 import tempfile
                 import os
                 
-                # Write bytes to a temp file because Whisper expects a file-like object
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
                 tmp.write(audio_bytes)
                 tmp.flush()
@@ -310,8 +371,8 @@ Return 8 specific product pages with:
         "model": "llama-3.1-sonar-small-128k-online",
         "messages": [{"role": "user", "content": search_prompt}],
         "search_domain_filter": domains,
-        "search_results": True,   # NEW format
-        "return_images": True,    # get pictures
+        "search_results": True,
+        "return_images": True,
     }
 
     r = requests.post(
@@ -321,7 +382,7 @@ Return 8 specific product pages with:
         timeout=30,
     )
     r.raise_for_status()
-    return r.json()              # return parsed JSON directly
+    return r.json()
 
 # Main interface
 st.markdown('<div class="search-container">', unsafe_allow_html=True)
@@ -345,10 +406,10 @@ if st.session_state.search_mode == "text":
     user_query = st.text_input(
         "",
         placeholder="Try: 'vintage leather jacket' or 'black midi dress for work'",
-        key="fashion_query"
+        key="fashion_query",
+        label_visibility="collapsed"
     )
     
-    # Show helpful tip
     st.markdown('<div class="fashion-tip">💡 <strong>Tip:</strong> Be specific about style, color, or occasion for better results!</div>', unsafe_allow_html=True)
 
 elif st.session_state.search_mode == "voice":
@@ -362,24 +423,20 @@ st.markdown('</div>', unsafe_allow_html=True)
 if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use_container_width=True):
     user_query = user_query.strip()
     
-    # Detect vintage search
     is_vintage = is_vintage_search(user_query)
     
     if is_vintage:
         st.markdown('<div class="vintage-indicator">🌿 Sustainable Fashion Search</div>', unsafe_allow_html=True)
     
-    # Progress tracking
     progress_bar = st.progress(0)
     status_text = st.empty()
     
     try:
-        # Step 1: Refine query
         status_text.text("🧠 Analyzing your style preferences...")
         progress_bar.progress(25)
         
         refined_query = refine_search_query(user_query, is_vintage)
         
-        # Step 2: Search
         status_text.text("🔍 Searching fashion platforms...")
         progress_bar.progress(50)
         
@@ -392,42 +449,36 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
         
         progress_bar.progress(100)
         status_text.text("🎉 Your style curation is ready!")
-        # Clear progress
         time.sleep(1)
         progress_bar.empty()
         status_text.empty()
         
-        # Display search info
         search_type = "Vintage/Secondhand" if is_vintage else "New Fashion"
         st.markdown(f"""
         <div class="search-container">
             <h3>🎯 {search_type} Search Results</h3>
-            <p style="font-size: 1.1rem; color: #666;">Searched for: "{refined_query}"</p>
+            <p style="font-size: 1.1rem; color: var(--cream); opacity: 0.8;">Searched for: "{refined_query}"</p>
         </div>
         """, unsafe_allow_html=True)
         
-        # AI styling advice
         ai_response = data['choices'][0]['message']['content']
         st.markdown("## 💎 Your Personal Stylist Says:")
         st.markdown(f'<div class="search-container">{ai_response}</div>', unsafe_allow_html=True)
             
-        # ---------------- Product grid -----------------
         if data.get("search_results"):
             shop_title = "🌿 Shop Sustainable Fashion" if is_vintage else "🛍️ Shop These Curated Picks"
             st.markdown(f"## {shop_title}")
 
-            # Get images from separate images array
             images = data.get("images", [])
 
             cols = st.columns(2)
             for i, prod in enumerate([p for p in data["search_results"] if looks_like_product(p.get("url",""))][:8]):
                 if not prod.get("url") or not prod.get("title"):
-                    continue  # skip junk
+                    continue
 
                 with cols[i % 2]:
                     st.markdown('<div class="product-card">', unsafe_allow_html=True)
 
-                    # Extract image URL from dictionary or use directly
                     image_url = None
                     if i < len(images) and images[i] is not None:
                         img_data = images[i]
@@ -438,22 +489,20 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
                     
                     if image_url:
                         try:
-                            st.image(image_url, use_column_width=True)
+                            st.image(image_url, use_column_width=True, caption=f"Image for {prod.get('title', 'product')}")
                         except:
-                            st.markdown('<div style="height: 200px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; border-radius: 10px; color: #999;">📸 Image unavailable</div>', unsafe_allow_html=True)
+                            st.markdown('<div class="product-image" style="display: flex; align-items: center; justify-content: center; color: #999;">📸 Image unavailable</div>', unsafe_allow_html=True)
                     else:
-                        st.markdown('<div style="height: 200px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; border-radius: 10px; color: #999;">📸 No image</div>', unsafe_allow_html=True)
+                        st.markdown('<div class="product-image" style="display: flex; align-items: center; justify-content: center; color: #999;">📸 No image</div>', unsafe_allow_html=True)
 
-                    # title & price
                     st.markdown(f"**{prod['title']}**")
                     if prod.get("price"):
                         st.markdown(f"💰 {prod['price']}")
 
-                    # shop button
                     button_class = "vintage-button" if is_vintage else "shop-button"
                     emoji = "♻️" if is_vintage else "✨"
                     st.markdown(
-                        f'<a href="{prod["url"]}" target="_blank" class="{button_class}">{emoji} Shop&nbsp;Now</a>',
+                        f'<a href="{prod["url"]}" target="_blank" class="{button_class}">{emoji} Shop Now</a>',
                         unsafe_allow_html=True,
                     )
 
@@ -471,7 +520,7 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
 # Footer
 st.markdown("""
 ---
-<div style="text-align: center; padding: 2rem; color: rgba(255,255,255,0.8);">
+<div style="text-align: center; padding: 2rem; color: rgba(240, 230, 208, 0.7);">
     <p style="font-family: 'Playfair Display', serif; font-size: 1.1rem;">
         ✨ <strong>Style Scout</strong> - Where AI meets fashion discovery ✨
     </p>
