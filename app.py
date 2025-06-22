@@ -16,89 +16,116 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- NEW CUSTOM CSS ---
-# Updated with the "Brown and Cream" color palette
+# --- UPDATED CUSTOM CSS ---
+# Updated with better contrast and cream boxes
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600&display=swap');
     
-    /* Palette Variables from the image */
+    /* Palette Variables */
     :root {
-        --cream: #F0E6D0;
-        --caramel: #C3895D;
-        --coffee: #956737;
-        --brownie: #5E3D23;
-        --dark-bg: #3D2C1D; /* A deep brown for the main background */
+        --cream: #F4F0EC;           /* Light cream for boxes */
+        --caramel: #C3895D;         /* Medium brown for accents */
+        --coffee: #956737;          /* Medium-dark brown */
+        --brownie: #5E3D23;         /* Dark brown for text */
+        --very-dark: #2D1B0F;       /* Very dark brown for text on cream */
+        --dark-bg: #3D2C1D;         /* Deep brown for background */
     }
 
-    /* Main App Background */
+    /* Main App Background - Keep Brown */
     .stApp {
-        background-color: var(--dark-bg);
+        background-color: var(--dark-bg) !important;
     }
 
-    /* General text color for readability on dark background */
-    h1, h2, h3, h4, h5, h6, p, li, .st-emotion-cache-16idsys p {
-        color: var(--cream);
+    /* Logo container - top left */
+    .logo-container {
+        position: fixed;
+        top: 1rem;
+        left: 1rem;
+        z-index: 1000;
+        width: 60px;
+        height: 60px;
     }
     
-    /* Main Header Block */
+    .logo-container img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    /* General text - Dark brown on light backgrounds */
+    h1, h2, h3, h4, h5, h6 {
+        color: var(--very-dark) !important;
+    }
+    
+    p, li, .st-emotion-cache-16idsys p {
+        color: var(--very-dark) !important;
+    }
+    
+    /* Main Header Block - Cream Background */
     .main-header {
-        background: rgba(240, 230, 208, 0.05); /* Transparent Cream */
+        background: var(--cream) !important;
         backdrop-filter: blur(15px);
         border-radius: 20px;
         padding: 2rem;
         margin: 1rem 0 2rem 0;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
         text-align: center;
-        border: 1px solid rgba(240, 230, 208, 0.15); /* Cream border */
+        border: 2px solid var(--caramel);
     }
     
-    /* Main Title: "Style Scout" */
+    /* Main Title: "Style Scout" - Dark Brown */
     .main-title {
         font-family: 'Playfair Display', serif;
         font-size: 3rem;
         font-weight: 700;
-        color: var(--caramel); /* Caramel color for the title */
+        color: var(--very-dark) !important;
         margin-bottom: 0.5rem;
     }
     
-    /* Subtitle text */
+    /* Subtitle text - Dark Brown */
     .subtitle {
         font-family: 'Inter', sans-serif;
         font-size: 1.1rem;
-        color: var(--cream);
-        opacity: 0.8;
-        font-weight: 300;
+        color: var(--brownie) !important;
+        font-weight: 400;
         margin-bottom: 1rem;
     }
     
-    /* Containers for search, results, etc. */
+    /* Containers - Cream Background */
     .search-container, .voice-recording {
-        background: rgba(240, 230, 208, 0.05); /* Transparent Cream */
+        background: var(--cream) !important;
         backdrop-filter: blur(15px);
         border-radius: 15px;
         padding: 2rem;
         margin: 1rem 0;
         box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-        border: 1px solid rgba(240, 230, 208, 0.15);
+        border: 1px solid var(--caramel);
     }
     
-    /* Product Card */
+    /* Product Card - Cream Background */
     .product-card {
-        background: rgba(240, 230, 208, 0.1);
+        background: var(--cream) !important;
         backdrop-filter: blur(10px);
         border-radius: 15px;
         padding: 1.5rem;
         margin: 1rem 0;
         box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-        border: 1px solid rgba(240, 230, 208, 0.2);
-        transition: transform 0.3s ease, background 0.3s ease;
-        color: var(--cream); /* Text inside the card should be light */
+        border: 1px solid var(--caramel);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
     
     .product-card:hover {
         transform: translateY(-5px);
-        background: rgba(240, 230, 208, 0.2);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+    }
+    
+    .product-card h1, .product-card h2, .product-card h3, 
+    .product-card h4, .product-card h5, .product-card h6,
+    .product-card p, .product-card div {
+        color: var(--very-dark) !important;
     }
     
     .product-image {
@@ -112,37 +139,36 @@ st.markdown("""
     /* Vintage Indicator Badge */
     .vintage-indicator {
         background: linear-gradient(45deg, var(--coffee), var(--caramel));
-        color: var(--cream);
+        color: var(--cream) !important;
         padding: 0.5rem 1rem;
         border-radius: 20px;
         font-size: 0.9rem;
         font-weight: 600;
         margin: 0.5rem 0;
         display: inline-block;
-        border: 1px solid rgba(240, 230, 208, 0.3);
+        border: 1px solid var(--caramel);
     }
     
     /* Fashion Tip Box */
     .fashion-tip {
         background: transparent;
-        border-left: 4px solid var(--caramel); /* Caramel accent border */
+        border-left: 4px solid var(--caramel);
         padding: 1rem;
         border-radius: 0 10px 10px 0;
         margin: 1rem 0;
         font-style: italic;
-        color: var(--cream);
-        opacity: 0.9;
+        color: var(--very-dark) !important;
     }
 
-    /* Style for custom "Shop Now" links */
+    /* Shop buttons */
     .shop-button, .vintage-button {
         display: inline-block;
         width: 100%;
         padding: 0.75rem 1rem;
         margin-top: 1rem;
         border-radius: 8px;
-        background-color: var(--caramel);
-        color: var(--brownie) !important; /* Dark text on caramel button */
+        background-color: var(--caramel) !important;
+        color: var(--cream) !important;
         font-weight: 600;
         text-align: center;
         text-decoration: none;
@@ -150,39 +176,76 @@ st.markdown("""
     }
 
     .shop-button:hover, .vintage-button:hover {
-        background-color: var(--coffee);
+        background-color: var(--coffee) !important;
         color: var(--cream) !important;
         text-decoration: none;
+        transform: translateY(-2px);
     }
     
-    /* Style for main Streamlit buttons */
+    /* Main Streamlit buttons */
     .stButton > button {
-        background-color: var(--caramel);
-        color: var(--brownie);
-        border: 1px solid transparent;
+        background-color: var(--caramel) !important;
+        color: var(--cream) !important;
+        border: 1px solid var(--caramel) !important;
         border-radius: 8px;
         font-weight: 600;
         padding: 0.75rem;
     }
     .stButton > button:hover {
-        background-color: var(--coffee);
-        color: var(--cream);
-        border: 1px solid var(--coffee);
+        background-color: var(--coffee) !important;
+        color: var(--cream) !important;
+        border: 1px solid var(--coffee) !important;
     }
     .stButton > button:disabled {
-        background-color: rgba(149, 103, 55, 0.5); /* Dimmed Coffee */
-        color: rgba(240, 230, 208, 0.5); /* Dimmed Cream */
-        border-color: transparent;
+        background-color: rgba(149, 103, 55, 0.5) !important;
+        color: rgba(240, 230, 208, 0.5) !important;
+        border-color: transparent !important;
     }
 
-    /* Style for text input */
+    /* Text input - FIXED for readability */
     .stTextInput > div > div > input {
-        background-color: rgba(240, 230, 208, 0.1);
-        color: var(--cream);
-        border: 1px solid rgba(240, 230, 208, 0.2);
+        background-color: white !important;
+        color: var(--very-dark) !important;
+        border: 2px solid var(--caramel) !important;
         border-radius: 8px;
+        font-size: 1rem !important;
+        padding: 0.75rem !important;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: var(--coffee) !important;
+        box-shadow: 0 0 10px rgba(195, 137, 93, 0.3) !important;
+    }
+    
+    .stTextInput > div > div > input::placeholder {
+        color: rgba(45, 27, 15, 0.6) !important;
+    }
+    
+    /* Progress bar styling */
+    .stProgress .st-bo {
+        background-color: var(--caramel) !important;
+    }
+    
+    /* Success/error messages */
+    .stSuccess {
+        background-color: rgba(195, 137, 93, 0.1) !important;
+        border-left: 4px solid var(--caramel) !important;
+        color: var(--very-dark) !important;
+    }
+    
+    .stError {
+        background-color: rgba(139, 69, 19, 0.1) !important;
+        border-left: 4px solid var(--brownie) !important;
+        color: var(--very-dark) !important;
     }
 </style>
+""", unsafe_allow_html=True)
+
+# Add logo in top left corner
+st.markdown("""
+<div class="logo-container">
+    <img src="style.png" alt="Style Scout Logo">
+</div>
 """, unsafe_allow_html=True)
 
 # Initialize session state
@@ -294,7 +357,7 @@ def voice_recorder():
     """Record from mic, transcribe with Whisper, return text."""
     st.markdown("### 🎙️ Voice Fashion Search")
     
-    # --- UPDATED VOICE RECORDER COLORS ---
+    # Voice recorder with updated colors
     audio_bytes = audio_recorder(
         text="🎤",
         recording_color="#956737",  # Coffee
@@ -457,7 +520,7 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
         st.markdown(f"""
         <div class="search-container">
             <h3>🎯 {search_type} Search Results</h3>
-            <p style="font-size: 1.1rem; color: var(--cream); opacity: 0.8;">Searched for: "{refined_query}"</p>
+            <p style="font-size: 1.1rem;">Searched for: "{refined_query}"</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -489,11 +552,11 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
                     
                     if image_url:
                         try:
-                            st.image(image_url, use_column_width=True, caption=f"Image for {prod.get('title', 'product')}")
+                            st.image(image_url, use_column_width=True)
                         except:
-                            st.markdown('<div class="product-image" style="display: flex; align-items: center; justify-content: center; color: #999;">📸 Image unavailable</div>', unsafe_allow_html=True)
+                            st.markdown('<div style="height: 200px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; border-radius: 10px; color: #999;">📸 Image unavailable</div>', unsafe_allow_html=True)
                     else:
-                        st.markdown('<div class="product-image" style="display: flex; align-items: center; justify-content: center; color: #999;">📸 No image</div>', unsafe_allow_html=True)
+                        st.markdown('<div style="height: 200px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; border-radius: 10px; color: #999;">📸 No image</div>', unsafe_allow_html=True)
 
                     st.markdown(f"**{prod['title']}**")
                     if prod.get("price"):
@@ -502,7 +565,7 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
                     button_class = "vintage-button" if is_vintage else "shop-button"
                     emoji = "♻️" if is_vintage else "✨"
                     st.markdown(
-                        f'<a href="{prod["url"]}" target="_blank" class="{button_class}">{emoji} Shop Now</a>',
+                        f'<a href="{prod["url"]}" target="_blank" class="{button_class}">{emoji} Shop Now</a>',
                         unsafe_allow_html=True,
                     )
 
@@ -520,7 +583,7 @@ if st.button("🔍 Find My Perfect Style!", disabled=not user_query.strip(), use
 # Footer
 st.markdown("""
 ---
-<div style="text-align: center; padding: 2rem; color: rgba(240, 230, 208, 0.7);">
+<div style="text-align: center; padding: 2rem; color: var(--cream); opacity: 0.7;">
     <p style="font-family: 'Playfair Display', serif; font-size: 1.1rem;">
         ✨ <strong>Style Scout</strong> - Where AI meets fashion discovery ✨
     </p>
